@@ -3,25 +3,25 @@ def workspaceFolderName = "${WORKSPACE_NAME}"
 def projectFolderName = "${PROJECT_NAME}"
 
 // Variables
-def referenceAppgitRepo = "vim"
+def referenceAppgitRepo = 'vim'
 def referenceAppGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + referenceAppgitRepo
-def chefUtilsRepo = "adop-cartridge-chef-scripts"
+def chefUtilsRepo = 'adop-cartridge-chef-scripts'
 def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + chefUtilsRepo
 
 // Jobs
-def chefGetCookboks = freeStyleJob(projectFolderName + "/Get_Cookbooks")
-def chefSanityTest = freeStyleJob(projectFolderName + "/Sanity_Test")
-def chefUnitTest = freeStyleJob(projectFolderName + "/Unit_Test")
-def chefConvergeTest = freeStyleJob(projectFolderName + "/Converge_Test")
-def chefPromoteNonProdChefServer = freeStyleJob(projectFolderName + "/Promote_NonProd_Chef_Server")
+def chefGetCookboks = freeStyleJob(projectFolderName + '/Get_Cookbooks')
+def chefSanityTest = freeStyleJob(projectFolderName + '/Sanity_Test')
+def chefUnitTest = freeStyleJob(projectFolderName + '/Unit_Test')
+def chefConvergeTest = freeStyleJob(projectFolderName + '/Converge_Test')
+def chefPromoteNonProdChefServer = freeStyleJob(projectFolderName + '/Promote_NonProd_Chef_Server')
 
 // Views
-def pipelineView = buildPipelineView(projectFolderName + "/Chef_Pipeline")
+def pipelineView = buildPipelineView(projectFolderName + '/Chef_Pipeline')
 
 pipelineView.with {
     title('Chef Pipeline')
     displayedBuilds(5)
-    selectedJob(projectFolderName + "/Get_Cookbooks")
+    selectedJob(projectFolderName + '/Get_Cookbooks')
     showPipelineParameters()
     showPipelineDefinitionHeader()
     refreshFrequency(5)
@@ -66,13 +66,13 @@ chefGetCookboks.with {
                 |set -x'''.stripMargin())
     }
     publishers{
-        archiveArtifacts("**/*")
+        archiveArtifacts('**/*')
         downstreamParameterized {
-            trigger(projectFolderName + "/Sanity_Test") {
-                condition("UNSTABLE_OR_BETTER")
+            trigger(projectFolderName + '/Sanity_Test') {
+                condition('UNSTABLE_OR_BETTER')
                 parameters {
-                    predefinedProp("B",'${BUILD_NUMBER}')
-                    predefinedProp("PARENT_BUILD",'${JOB_NAME}')
+                    predefinedProp('B', '${BUILD_NUMBER}')
+                    predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
         }
@@ -95,7 +95,7 @@ chefSanityTest.with {
                 url(chefUtilsGitUrl)
                 credentials('adop-jenkins-master')
             }
-            branch("*/master")
+            branch('*/master')
         }
     }
     wrappers {
@@ -112,17 +112,17 @@ chefSanityTest.with {
             }
         }
         shell('''set -x
-                |docker run --rm -v jenkins_slave_home:/jenkins_slave_home/ kramos/adop-chef-test /jenkins_slave_home/$JOB_NAME/ChefCI/chef_sanity_test.sh /jenkins_slave_home/$JOB_NAME/
+                |docker run --rm -e affinity:container==jenkins-slave -v jenkins_slave_home:/jenkins_slave_home/ iniweb/adop-chef-test-alpine /jenkins_slave_home/$JOB_NAME/ChefCI/chef_sanity_test.sh /jenkins_slave_home/$JOB_NAME/
                 |'''.stripMargin())
     }
     publishers {
-        archiveArtifacts("ChefCI/**/*")
+        archiveArtifacts('**/*')
         downstreamParameterized {
-            trigger(projectFolderName + "/Unit_Test") {
-                condition("UNSTABLE_OR_BETTER")
+            trigger(projectFolderName + '/Unit_Test') {
+                condition('UNSTABLE_OR_BETTER')
                 parameters {
-                    predefinedProp("B",'${BUILD_NUMBER}')
-                    predefinedProp("PARENT_BUILD", '${JOB_NAME}')
+                    predefinedProp('B', '${B}')
+                    predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
         }
@@ -143,9 +143,9 @@ chefUnitTest.with {
         preBuildCleanup()
         injectPasswords()
         maskPasswords()
-        sshAgent("adop-jenkins-master")
+        sshAgent('adop-jenkins-master')
     }
-    label("docker")
+    label('docker')
     steps {
         copyArtifacts('Sanity_Test') {
             buildSelector {
@@ -153,16 +153,16 @@ chefUnitTest.with {
             }
         }
         shell('''set -x
-                |docker run --rm -v jenkins_slave_home:/jenkins_slave_home/ kramos/adop-chef-test /jenkins_slave_home/$JOB_NAME/ChefCI/chef_unit_test.sh /jenkins_slave_home/$JOB_NAME/
+                |docker run --rm -e affinity:container==jenkins-slave -v jenkins_slave_home:/jenkins_slave_home/ iniweb/adop-chef-test-alpine /jenkins_slave_home/$JOB_NAME/ChefCI/chef_unit_test.sh /jenkins_slave_home/$JOB_NAME/
                 |'''.stripMargin())
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + "/Converge_Test") {
-                condition("UNSTABLE_OR_BETTER")
+            trigger(projectFolderName + '/Converge_Test') {
+                condition('UNSTABLE_OR_BETTER')
                 parameters {
-                    predefinedProp("B",'${B}')
-                    predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
+                    predefinedProp('B', '${B}')
+                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
                 }
             }
         }
@@ -173,40 +173,42 @@ chefConvergeTest.with {
     description('This job tests a converge with the cookbook')
     parameters {
         stringParam('B', '', 'Parent build number')
-        stringParam('PARENT_BUILD', 'Get_Cookbooks', 'Parent build name')
+        stringParam('PARENT_BUILD', 'Unit_Test', 'Parent build name')
     }
     wrappers {
         preBuildCleanup()
         injectPasswords()
         maskPasswords()
-        sshAgent("adop-jenkins-master")
+        sshAgent('adop-jenkins-master')
     }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
         env('PROJECT_NAME',projectFolderName)
     }
-    label("docker")
+    label('docker')
     steps {
-        shell('''set +x
-                |echo TODO clean up
-                |'''.stripMargin())
-        copyArtifacts("Sanity_Test") {
+        copyArtifacts('Sanity_Test') {
             buildSelector {
                 buildNumber('${B}')
             }
         }
         shell('''set +x
-                |echo TODO run kitchen
+                |docker run -t -P --net=$DOCKER_NETWORK_NAME --rm \\
+                |   -e affinity:container==jenkins-slave \\
+                |   -v /var/run/docker.sock:/var/run/docker.sock \\
+                |   -v jenkins_slave_home:/jenkins_slave_home/ \\
+                |   -w="/jenkins_slave_home/${JOB_NAME}" \\
+                |   iniweb/adop-chef-test-alpine \\
+                |   bash -c "KITCHEN_LOCAL_YAML=.kitchen.docker.yml kitchen converge"
                 |'''.stripMargin())
-        }
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + "/Promote_NonProd_Chef_Server") {
-                condition("UNSTABLE_OR_BETTER")
+            trigger(projectFolderName + '/Promote_NonProd_Chef_Server') {
+                condition('UNSTABLE_OR_BETTER')
                 parameters {
-                    predefinedProp("B",'${B}')
-                    predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
+                    predefinedProp('B', '${B}')
+                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
                 }
             }
         }
@@ -217,13 +219,13 @@ chefPromoteNonProdChefServer.with {
     description('This job uploads the cookbook to the non-production Chef Server')
     parameters {
         stringParam('B', '', 'Parent build number')
-        stringParam('PARENT_BUILD', 'Get_Cookbooks', 'Parent build name')
+        stringParam('PARENT_BUILD', 'Converge_Test', 'Parent build name')
     }
     wrappers {
         preBuildCleanup()
         injectPasswords()
         maskPasswords()
-        sshAgent("adop-jenkins-master")
+        sshAgent('adop-jenkins-master')
     }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
@@ -234,6 +236,5 @@ chefPromoteNonProdChefServer.with {
         shell('''set +x
             |echo TODO converge
             |set -x'''.stripMargin())
-        }
     }
 }
