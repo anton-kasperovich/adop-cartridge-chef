@@ -112,7 +112,10 @@ chefSanityTest.with {
             }
         }
         shell('''set -x
-                |docker run --rm -e affinity:container==jenkins-slave -v jenkins_slave_home:/jenkins_slave_home/ iniweb/adop-chef-test-alpine /jenkins_slave_home/$JOB_NAME/ChefCI/chef_sanity_test.sh /jenkins_slave_home/$JOB_NAME/
+                |docker run -t --rm -e affinity:container==jenkins-slave \\
+                |   -v jenkins_slave_home:/jenkins_slave_home/ \\
+                |   iniweb/adop-chef-test-alpine \\
+                |   /jenkins_slave_home/$JOB_NAME/ChefCI/chef_sanity_test.sh /jenkins_slave_home/$JOB_NAME/
                 |'''.stripMargin())
     }
     publishers {
@@ -153,7 +156,10 @@ chefUnitTest.with {
             }
         }
         shell('''set -x
-                |docker run --rm -e affinity:container==jenkins-slave -v jenkins_slave_home:/jenkins_slave_home/ iniweb/adop-chef-test-alpine /jenkins_slave_home/$JOB_NAME/ChefCI/chef_unit_test.sh /jenkins_slave_home/$JOB_NAME/
+                |docker run -t --rm -e affinity:container==jenkins-slave \\
+                |   -v jenkins_slave_home:/jenkins_slave_home/ \\
+                |   iniweb/adop-chef-test-alpine \\
+                |   /jenkins_slave_home/$JOB_NAME/ChefCI/chef_unit_test.sh /jenkins_slave_home/$JOB_NAME/
                 |'''.stripMargin())
     }
     publishers {
@@ -192,14 +198,28 @@ chefConvergeTest.with {
                 buildNumber('${B}')
             }
         }
-        shell('''set +x
-                |docker run -t -P --net=$DOCKER_NETWORK_NAME --rm \\
+        shell('''set +e
+                |docker run -t -P --net=host --rm \\
                 |   -e affinity:container==jenkins-slave \\
                 |   -v /var/run/docker.sock:/var/run/docker.sock \\
                 |   -v jenkins_slave_home:/jenkins_slave_home/ \\
                 |   -w="/jenkins_slave_home/${JOB_NAME}" \\
                 |   iniweb/adop-chef-test-alpine \\
-                |   bash -c "KITCHEN_LOCAL_YAML=.kitchen.docker.yml kitchen converge"
+                |   bash -c 'KITCHEN_LOCAL_YAML=.kitchen.docker.yml kitchen test centos-7 -d never'
+                |
+                |EXIT_CODE=$?
+                |set -e
+                |
+                |docker run --rm \\
+                |   -e affinity:container==jenkins-slave \\
+                |   -v /var/run/docker.sock:/var/run/docker.sock \\
+                |   -v jenkins_slave_home:/jenkins_slave_home/ \\
+                |   -w="/jenkins_slave_home/${JOB_NAME}" \\
+                |   iniweb/adop-chef-test-alpine \\
+                |   bash -c 'KITCHEN_LOCAL_YAML=.kitchen.docker.yml kitchen destroy'
+                |
+                |exit ${EXIT_CODE}
+                |
                 |'''.stripMargin())
     }
     publishers {
