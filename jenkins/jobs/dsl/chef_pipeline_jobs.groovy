@@ -60,11 +60,6 @@ chefGetCookboks.with {
         }
     }
     label('docker')
-    steps {
-        shell('''set +x
-                |echo
-                |set -x'''.stripMargin())
-    }
     publishers{
         archiveArtifacts('**/*')
         downstreamParameterized {
