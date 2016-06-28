@@ -3,16 +3,17 @@ def workspaceFolderName = "${WORKSPACE_NAME}"
 def projectFolderName = "${PROJECT_NAME}"
 
 // Variables
-def referenceAppgitRepo = 'vim'
+def referenceAppgitRepo = 'chef-cookbook-vim'
 def referenceAppGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + referenceAppgitRepo
-def chefUtilsRepo = 'adop-cartridge-chef-scripts'
+def chefUtilsRepo = 'cartridge-chef-scripts'
 def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + chefUtilsRepo
 
 // Jobs
 def chefGetCookboks = freeStyleJob(projectFolderName + '/Get_Cookbooks')
 def chefSanityTest = freeStyleJob(projectFolderName + '/Sanity_Test')
 def chefUnitTest = freeStyleJob(projectFolderName + '/Unit_Test')
-def chefConvergeTest = freeStyleJob(projectFolderName + '/Converge_Test')
+def chefCodeAnalysis = freeStyleJob(projectFolderName + '/Code_Analysis')
+def chefIntegrationTest = freeStyleJob(projectFolderName + '/Integration_Test')
 def chefPromoteNonProdChefServer = freeStyleJob(projectFolderName + '/Promote_NonProd_Chef_Server')
 
 // Views
@@ -28,7 +29,7 @@ pipelineView.with {
 }
 
 chefGetCookboks.with {
-    description('This job downloads the cookbook.')
+    description('This job downloads a cookbook.')
     wrappers {
         preBuildCleanup()
         injectPasswords()
@@ -75,7 +76,7 @@ chefGetCookboks.with {
 }
 
 chefSanityTest.with {
-    description('This job runs sanity checks on the cookbook.')
+    description('This job runs sanity checks on a cookbook.')
     parameters {
         stringParam('B', '', 'Parent build number')
         stringParam('PARENT_BUILD', 'Get_Cookbooks', 'Parent build name')
@@ -109,7 +110,7 @@ chefSanityTest.with {
         shell('''set -x
                 |docker run -t --rm -e affinity:container==jenkins-slave \\
                 |   -v jenkins_slave_home:/jenkins_slave_home/ \\
-                |   iniweb/adop-chef-test-alpine \\
+                |   iniweb/adop-chef-test-alpine:0.0.1 \\
                 |   /jenkins_slave_home/$JOB_NAME/ChefCI/chef_sanity_test.sh /jenkins_slave_home/$JOB_NAME/
                 |'''.stripMargin())
     }
@@ -128,7 +129,7 @@ chefSanityTest.with {
 }
 
 chefUnitTest.with {
-    description('This job runs sanity tests of the cookbook.')
+    description('This job runs sanity tests of a cookbook.')
     parameters {
         stringParam('B', '', 'Parent build number')
         stringParam('PARENT_BUILD', 'Sanity_Test', 'Parent build name')
@@ -153,13 +154,13 @@ chefUnitTest.with {
         shell('''set -x
                 |docker run -t --rm -e affinity:container==jenkins-slave \\
                 |   -v jenkins_slave_home:/jenkins_slave_home/ \\
-                |   iniweb/adop-chef-test-alpine \\
+                |   iniweb/adop-chef-test-alpine:0.0.1 \\
                 |   /jenkins_slave_home/$JOB_NAME/ChefCI/chef_unit_test.sh /jenkins_slave_home/$JOB_NAME/
                 |'''.stripMargin())
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + '/Converge_Test') {
+            trigger(projectFolderName + '/Code_Analysis') {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
@@ -170,8 +171,59 @@ chefUnitTest.with {
     }
 }
 
-chefConvergeTest.with {
-    description('This job tests a converge with the cookbook')
+chefCodeAnalysis.with {
+    description('This job runs code analysis of a cookbook.')
+    parameters {
+        stringParam('B', '', 'Parent build number')
+        stringParam('PARENT_BUILD', 'Unit_Test', 'Parent build name')
+    }
+    environmentVariables {
+        env('WORKSPACE_NAME',workspaceFolderName)
+        env('PROJECT_NAME',projectFolderName)
+    }
+    wrappers {
+        preBuildCleanup()
+        injectPasswords()
+        maskPasswords()
+        sshAgent('adop-jenkins-master')
+    }
+    label('docker')
+    steps {
+        copyArtifacts('Sanity_Test') {
+            buildSelector {
+                buildNumber('${B}')
+                includePatterns('ChefCI/**')
+            }
+        }
+        copyArtifacts('Get_Cookbooks') {
+            buildSelector {
+                buildNumber('${B}')
+                includePatterns('**')
+                targetDirectory('cookbook')
+            }
+        }
+        shell('''set -x
+                |docker run -t --rm -e affinity:container==jenkins-slave \\
+                |   -v jenkins_slave_home:/jenkins_slave_home/ \\
+                |   iniweb/adop-chef-test-alpine:0.0.1 \\
+                |   /jenkins_slave_home/$JOB_NAME/ChefCI/chef_code_analysis.sh /jenkins_slave_home/$JOB_NAME/cookbook
+                |'''.stripMargin())
+    }
+    publishers {
+        downstreamParameterized {
+            trigger(projectFolderName + '/Integration_Test') {
+                condition('UNSTABLE_OR_BETTER')
+                parameters {
+                    predefinedProp('B', '${B}')
+                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
+                }
+            }
+        }
+    }
+}
+
+chefIntegrationTest.with {
+    description('This job runs integration tests with a cookbook')
     parameters {
         stringParam('B', '', 'Parent build number')
         stringParam('PARENT_BUILD', 'Unit_Test', 'Parent build name')
@@ -194,13 +246,19 @@ chefConvergeTest.with {
             }
         }
         shell('''set +e
+                |
+                |KITCHEN_FILE=.kitchen.docker.yml
+                |if [ ! -f $KITCHEN_FILE ]; then
+                |    KITCHEN_FILE=.kitchen.yml
+                |fi
+                |
                 |docker run -t -P --net=host --rm \\
                 |   -e affinity:container==jenkins-slave \\
                 |   -v /var/run/docker.sock:/var/run/docker.sock \\
                 |   -v jenkins_slave_home:/jenkins_slave_home/ \\
                 |   -w="/jenkins_slave_home/${JOB_NAME}" \\
-                |   iniweb/adop-chef-test-alpine \\
-                |   bash -c 'KITCHEN_LOCAL_YAML=.kitchen.docker.yml kitchen test centos-7 -d never'
+                |   iniweb/adop-chef-test-alpine:0.0.1 \\
+                |   bash -c "KITCHEN_LOCAL_YAML=${KITCHEN_FILE} kitchen test -d never"
                 |
                 |EXIT_CODE=$?
                 |set -e
@@ -210,8 +268,8 @@ chefConvergeTest.with {
                 |   -v /var/run/docker.sock:/var/run/docker.sock \\
                 |   -v jenkins_slave_home:/jenkins_slave_home/ \\
                 |   -w="/jenkins_slave_home/${JOB_NAME}" \\
-                |   iniweb/adop-chef-test-alpine \\
-                |   bash -c 'KITCHEN_LOCAL_YAML=.kitchen.docker.yml kitchen destroy'
+                |   iniweb/adop-chef-test-alpine:0.0.1 \\
+                |   bash -c "KITCHEN_LOCAL_YAML=${KITCHEN_FILE} kitchen destroy"
                 |
                 |exit ${EXIT_CODE}
                 |
@@ -219,8 +277,7 @@ chefConvergeTest.with {
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + '/Promote_NonProd_Chef_Server') {
-                condition('UNSTABLE_OR_BETTER')
+            buildPipelineTrigger(projectFolderName + '/Promote_NonProd_Chef_Server') {
                 parameters {
                     predefinedProp('B', '${B}')
                     predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
@@ -231,10 +288,13 @@ chefConvergeTest.with {
 }
 
 chefPromoteNonProdChefServer.with {
-    description('This job uploads the cookbook to the non-production Chef Server')
+    description('This job uploads a cookbook to a non-production Chef Server')
     parameters {
+        stringParam('USERNAME','','Chef Server user name')
+        stringParam('VALIDATOR','','Chef Server validator')
+        stringParam('CHEF_SERVER_URL','','Chef Server URL')
         stringParam('B', '', 'Parent build number')
-        stringParam('PARENT_BUILD', 'Converge_Test', 'Parent build name')
+        stringParam('PARENT_BUILD', 'Integration_Test', 'Parent build name')
     }
     wrappers {
         preBuildCleanup()
@@ -248,8 +308,91 @@ chefPromoteNonProdChefServer.with {
     }
     label('docker')
     steps {
-        shell('''set +x
-            |echo TODO converge
-            |set -x'''.stripMargin())
+        copyArtifacts('Sanity_Test') {
+            buildSelector {
+                buildNumber('${B}')
+                includePatterns('ChefCI/**')
+            }
+        }
+        copyArtifacts('Get_Cookbooks') {
+            buildSelector {
+                buildNumber('${B}')
+                includePatterns('**')
+                targetDirectory('ChefCI/cookbooks/cookbook')
+            }
+        }
+        systemGroovyCommand('''
+               |import com.cloudbees.jenkins.plugins.sshcredentials.impl.*;
+               |import com.cloudbees.plugins.credentials.*;
+               |import com.cloudbees.plugins.credentials.common.*;
+               |import com.cloudbees.plugins.credentials.domains.*;
+               |import com.cloudbees.plugins.credentials.impl.*;
+               |import hudson.plugins.sshslaves.*;
+               |import jenkins.model.*;
+               |
+               |def p_key = "";
+               |
+               |  private credentials_for_username(String username) {
+               |    def username_matcher = CredentialsMatchers.withUsername(username)
+               |    def available_credentials =
+               |      CredentialsProvider.lookupCredentials(
+               |        StandardUsernameCredentials.class,
+               |        Jenkins.getInstance(),
+               |        hudson.security.ACL.SYSTEM,
+               |        new SchemeRequirement("ssh")
+               |      )
+               |
+               |    return CredentialsMatchers.firstOrNull(
+               |      available_credentials,
+               |       username_matcher
+               |    )
+               |  }
+               |  ////////////////////////
+               |  // current credentials
+               |  ////////////////////////
+               |  String credential_info(String username) {
+               |    def credentials = credentials_for_username(username)
+               |
+               |    if(credentials == null) {
+               |      return null
+               |    }
+               |
+               |    def current_credentials = [
+               |      id:credentials.id,
+               |      description:credentials.description,
+               |      username:credentials.username
+               |    ]
+               |
+               |    if ( credentials.hasProperty('password') ) {
+               |    current_credentials['password'] = credentials.password.plainText
+               |    } else {
+               |      current_credentials['private_key'] = credentials.privateKey
+               |      current_credentials['passphrase'] = credentials.passphrase.plainText
+               |    }
+               |    p_key = (current_credentials['private_key'])
+               |    return p_key
+               |  }
+               |
+               |username = build.buildVariableResolver.resolve("USERNAME")
+               |validator = build.buildVariableResolver.resolve("VALIDATOR")
+               |
+               |user_pem = credential_info(username)
+               |validator_pem = credential_info(validator)
+               |
+               |build.workspace.child("ChefCI/.chef/${username}.pem").write(user_pem, "UTF-8")
+               |build.workspace.child("ChefCI/.chef/${validator}.pem").write(validator_pem, "UTF-8")
+               '''.stripMargin())
+        shell('''set +e
+                |
+                |echo "Starting ..."
+                |docker run -t --rm -e affinity:container==jenkins-slave \\
+                |-e "CHEF_SERVER_URL=${CHEF_SERVER_URL}" \\
+                |-e "USERNAME=${USERNAME}" \\
+                |-e "VALIDATOR=${VALIDATOR}" \\
+                |-v jenkins_slave_home:/jenkins_slave_home/ \\
+                |iniweb/adop-chef-test-alpine:0.0.1 \\
+                |/jenkins_slave_home/$JOB_NAME/ChefCI/chef_berks_upload.sh /jenkins_slave_home/$JOB_NAME/ChefCI
+                |'''.stripMargin())
     }
+
 }
