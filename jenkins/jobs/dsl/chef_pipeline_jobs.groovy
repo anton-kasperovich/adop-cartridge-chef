@@ -322,10 +322,11 @@ chefPromoteNonProdChefServer.with {
             }
         }
         systemGroovyCommand('''
-                |import jenkins.model.*;
-                |import com.cloudbees.plugins.credentials.*;
-                |import com.cloudbees.plugins.credentials.common.*;
-                |import com.cloudbees.plugins.credentials.domains.*;
+                |import hudson.model.*
+                |import jenkins.model.*
+                |import com.cloudbees.plugins.credentials.*
+                |import com.cloudbees.plugins.credentials.common.*
+                |import com.cloudbees.plugins.credentials.domains.*
                 |
                 |private findCredentialsById(String cId) {
                 |  def username_matcher = CredentialsMatchers.withId(cId)
@@ -339,15 +340,21 @@ chefPromoteNonProdChefServer.with {
                 |  return CredentialsMatchers.firstOrNull(available_credentials, username_matcher)
                 |}
                 |
+                |envVars = []
+                |
                 |user = findCredentialsById(build.getEnvironment(listener).get('CHEF_SERVER_USERNAME'))
                 |if (user) {
+                |  envVars.add(new StringParameterValue("USERNAME", user.username))
                 |  build.workspace.child("ChefCI/.chef/${user.username}.pem").write(user.privateKey, "UTF-8")
                 |}
                 |
                 |validator = findCredentialsById(build.getEnvironment(listener).get('CHEF_SERVER_VALIDATOR'))
                 |if (validator) {
+                |  envVars.add(new StringParameterValue("VALIDATOR", validator.username))
                 |  build.workspace.child("ChefCI/.chef/${validator.username}.pem").write(validator.privateKey, "UTF-8")
                 |}
+                |
+                |Thread.currentThread().executable.addAction(new ParametersAction(envVars))
                '''.stripMargin())
         shell('''set +e
                 |
