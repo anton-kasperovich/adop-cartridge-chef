@@ -121,7 +121,7 @@ chefSanityTest.with {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
-                    predefinedProp('PARENT_BUILD', '${JOB_NAME}')
+                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
                 }
             }
         }
@@ -322,65 +322,32 @@ chefPromoteNonProdChefServer.with {
             }
         }
         systemGroovyCommand('''
-               |import com.cloudbees.jenkins.plugins.sshcredentials.impl.*;
-               |import com.cloudbees.plugins.credentials.*;
-               |import com.cloudbees.plugins.credentials.common.*;
-               |import com.cloudbees.plugins.credentials.domains.*;
-               |import com.cloudbees.plugins.credentials.impl.*;
-               |import hudson.plugins.sshslaves.*;
-               |import jenkins.model.*;
-               |
-               |def p_key = "";
-               |
-               |  private credentials_for_username(String username) {
-               |    def username_matcher = CredentialsMatchers.withUsername(username)
-               |    def available_credentials =
-               |      CredentialsProvider.lookupCredentials(
-               |        StandardUsernameCredentials.class,
-               |        Jenkins.getInstance(),
-               |        hudson.security.ACL.SYSTEM,
-               |        new SchemeRequirement("ssh")
-               |      )
-               |
-               |    return CredentialsMatchers.firstOrNull(
-               |      available_credentials,
-               |       username_matcher
-               |    )
-               |  }
-               |  ////////////////////////
-               |  // current credentials
-               |  ////////////////////////
-               |  String credential_info(String username) {
-               |    def credentials = credentials_for_username(username)
-               |
-               |    if(credentials == null) {
-               |      return null
-               |    }
-               |
-               |    def current_credentials = [
-               |      id:credentials.id,
-               |      description:credentials.description,
-               |      username:credentials.username
-               |    ]
-               |
-               |    if ( credentials.hasProperty('password') ) {
-               |    current_credentials['password'] = credentials.password.plainText
-               |    } else {
-               |      current_credentials['private_key'] = credentials.privateKey
-               |      current_credentials['passphrase'] = credentials.passphrase.plainText
-               |    }
-               |    p_key = (current_credentials['private_key'])
-               |    return p_key
-               |  }
-               |
-               |username = build.buildVariableResolver.resolve("USERNAME")
-               |validator = build.buildVariableResolver.resolve("VALIDATOR")
-               |
-               |user_pem = credential_info(username)
-               |validator_pem = credential_info(validator)
-               |
-               |build.workspace.child("ChefCI/.chef/${username}.pem").write(user_pem, "UTF-8")
-               |build.workspace.child("ChefCI/.chef/${validator}.pem").write(validator_pem, "UTF-8")
+                |import jenkins.model.*;
+                |import com.cloudbees.plugins.credentials.*;
+                |import com.cloudbees.plugins.credentials.common.*;
+                |import com.cloudbees.plugins.credentials.domains.*;
+                |
+                |private findCredentialsById(String cId) {
+                |  def username_matcher = CredentialsMatchers.withId(cId)
+                |  def available_credentials = CredentialsProvider.lookupCredentials(
+                |    StandardUsernameCredentials.class,
+                |    Jenkins.getInstance(),
+                |    hudson.security.ACL.SYSTEM,
+                |    new SchemeRequirement("ssh")
+                |  )
+                |
+                |  return CredentialsMatchers.firstOrNull(available_credentials, username_matcher)
+                |}
+                |
+                |user = findCredentialsById(build.getEnvironment(listener).get('CHEF_SERVER_USERNAME'))
+                |if (user) {
+                |  build.workspace.child("ChefCI/.chef/${user.username}.pem").write(user.privateKey, "UTF-8")
+                |}
+                |
+                |validator = findCredentialsById(build.getEnvironment(listener).get('CHEF_SERVER_VALIDATOR'))
+                |if (validator) {
+                |  build.workspace.child("ChefCI/.chef/${validator.username}.pem").write(validator.privateKey, "UTF-8")
+                |}
                '''.stripMargin())
         shell('''set +e
                 |
