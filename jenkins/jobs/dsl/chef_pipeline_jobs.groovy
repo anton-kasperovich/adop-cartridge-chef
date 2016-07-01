@@ -3,10 +3,18 @@ def workspaceFolderName = "${WORKSPACE_NAME}"
 def projectFolderName = "${PROJECT_NAME}"
 
 // Variables
-def referenceAppgitRepo = 'chef-cookbook-vim'
-def referenceAppGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + referenceAppgitRepo
-def chefUtilsRepo = 'cartridge-chef-scripts'
-def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + chefUtilsRepo
+def logRotatorNum = 10
+def logRotatorArtifactNum = 3
+def logRotatorDays = -1
+def logRotatorArtifactDays = -1
+
+def cookbookGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + '${COOKBOOK}'
+def cookbookGerritTriggerRegExp = (projectFolderName + '/.*cookbook.*').replaceAll("/", "\\\\/")
+def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/cartridge-chef-scripts"
+
+def chefServerUsername = "${CHEF_SERVER_USERNAME}"
+def chefServerValidator = "${CHEF_SERVER_VALIDATOR}"
+def chefServerOrganizationUrl = "${CHEF_SERVER_ORGANIZATION_URL}"
 
 // Jobs
 def chefGetCookboks = freeStyleJob(projectFolderName + '/Get_Cookbooks')
@@ -30,6 +38,9 @@ pipelineView.with {
 
 chefGetCookboks.with {
     description('This job downloads a cookbook.')
+    parameters {
+        stringParam('COOKBOOK', 'chef-cookbook-vim', "The name of the cookbook to package i.e. adop-cartridge-chef-reference - this job is invoked by a gerrit ref-updated hook")
+    }
     wrappers {
         preBuildCleanup()
         injectPasswords()
@@ -39,11 +50,17 @@ chefGetCookboks.with {
     scm {
         git {
             remote {
-                url(referenceAppGitUrl)
+                url(cookbookGitUrl)
                 credentials('adop-jenkins-master')
             }
             branch('*/master')
         }
+    }
+    logRotator {
+        numToKeep(logRotatorNum)
+        artifactNumToKeep(logRotatorArtifactNum)
+        daysToKeep(logRotatorDays)
+        artifactDaysToKeep(logRotatorArtifactDays)
     }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
@@ -54,7 +71,7 @@ chefGetCookboks.with {
             events {
                 refUpdated()
             }
-            project('plain:' + projectFolderName + '/' + referenceAppgitRepo, 'plain:master')
+            project('reg_exp:'+ cookbookGerritTriggerRegExp, 'plain:master')
             configure { node ->
                 node / serverName('ADOP Gerrit')
             }
@@ -80,6 +97,12 @@ chefSanityTest.with {
     parameters {
         stringParam('B', '', 'Parent build number')
         stringParam('PARENT_BUILD', 'Get_Cookbooks', 'Parent build name')
+    }
+    logRotator {
+        numToKeep(logRotatorNum)
+        artifactNumToKeep(logRotatorArtifactNum)
+        daysToKeep(logRotatorDays)
+        artifactDaysToKeep(logRotatorArtifactDays)
     }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
@@ -134,6 +157,12 @@ chefUnitTest.with {
         stringParam('B', '', 'Parent build number')
         stringParam('PARENT_BUILD', 'Sanity_Test', 'Parent build name')
     }
+    logRotator {
+        numToKeep(logRotatorNum)
+        artifactNumToKeep(logRotatorArtifactNum)
+        daysToKeep(logRotatorDays)
+        artifactDaysToKeep(logRotatorArtifactDays)
+    }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
         env('PROJECT_NAME',projectFolderName)
@@ -176,6 +205,12 @@ chefCodeAnalysis.with {
     parameters {
         stringParam('B', '', 'Parent build number')
         stringParam('PARENT_BUILD', 'Unit_Test', 'Parent build name')
+    }
+    logRotator {
+        numToKeep(logRotatorNum)
+        artifactNumToKeep(logRotatorArtifactNum)
+        daysToKeep(logRotatorDays)
+        artifactDaysToKeep(logRotatorArtifactDays)
     }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
@@ -234,6 +269,12 @@ chefIntegrationTest.with {
         maskPasswords()
         sshAgent('adop-jenkins-master')
     }
+    logRotator {
+        numToKeep(logRotatorNum)
+        artifactNumToKeep(logRotatorArtifactNum)
+        daysToKeep(logRotatorDays)
+        artifactDaysToKeep(logRotatorArtifactDays)
+    }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
         env('PROJECT_NAME',projectFolderName)
@@ -277,7 +318,7 @@ chefIntegrationTest.with {
     }
     publishers {
         downstreamParameterized {
-            buildPipelineTrigger(projectFolderName + '/Promote_NonProd_Chef_Server') {
+            trigger(projectFolderName + '/Promote_NonProd_Chef_Server') {
                 parameters {
                     predefinedProp('B', '${B}')
                     predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
@@ -290,9 +331,6 @@ chefIntegrationTest.with {
 chefPromoteNonProdChefServer.with {
     description('This job uploads a cookbook to a non-production Chef Server')
     parameters {
-        stringParam('USERNAME','','Chef Server user name')
-        stringParam('VALIDATOR','','Chef Server validator')
-        stringParam('CHEF_SERVER_URL','','Chef Server URL')
         stringParam('B', '', 'Parent build number')
         stringParam('PARENT_BUILD', 'Integration_Test', 'Parent build name')
     }
@@ -302,9 +340,18 @@ chefPromoteNonProdChefServer.with {
         maskPasswords()
         sshAgent('adop-jenkins-master')
     }
+    logRotator {
+        numToKeep(logRotatorNum)
+        artifactNumToKeep(logRotatorArtifactNum)
+        daysToKeep(logRotatorDays)
+        artifactDaysToKeep(logRotatorArtifactDays)
+    }
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
         env('PROJECT_NAME',projectFolderName)
+        env('CHEF_SERVER_URL',chefServerOrganizationUrl)
+        env('CHEF_SERVER_USERNAME',chefServerUsername)
+        env('CHEF_SERVER_VALIDATOR',chefServerValidator)
     }
     label('docker')
     steps {
@@ -358,7 +405,6 @@ chefPromoteNonProdChefServer.with {
                '''.stripMargin())
         shell('''set +e
                 |
-                |echo "Starting ..."
                 |docker run -t --rm -e affinity:container==jenkins-slave \\
                 |-e "CHEF_SERVER_URL=${CHEF_SERVER_URL}" \\
                 |-e "USERNAME=${USERNAME}" \\
