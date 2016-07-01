@@ -144,6 +144,7 @@ chefSanityTest.with {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
+                    predefinedProp('UTILS_B', '${BUILD_NUMBER}')
                     predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
@@ -155,6 +156,7 @@ chefUnitTest.with {
     description('This job runs sanity tests of a cookbook.')
     parameters {
         stringParam('B', '', 'Parent build number')
+        stringParam('UTILS_B', '', 'Parent utils build number')
         stringParam('PARENT_BUILD', 'Sanity_Test', 'Parent build name')
     }
     logRotator {
@@ -177,7 +179,7 @@ chefUnitTest.with {
     steps {
         copyArtifacts('Sanity_Test') {
             buildSelector {
-                buildNumber('${B}')
+                buildNumber('${UTILS_B}')
             }
         }
         shell('''set -x
@@ -193,6 +195,7 @@ chefUnitTest.with {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
+                    predefinedProp('UTILS_B', '${UTILS_B}')
                     predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
@@ -204,6 +207,7 @@ chefCodeAnalysis.with {
     description('This job runs code analysis of a cookbook.')
     parameters {
         stringParam('B', '', 'Parent build number')
+        stringParam('UTILS_B', '', 'Parent utils build number')
         stringParam('PARENT_BUILD', 'Unit_Test', 'Parent build name')
     }
     logRotator {
@@ -226,7 +230,7 @@ chefCodeAnalysis.with {
     steps {
         copyArtifacts('Sanity_Test') {
             buildSelector {
-                buildNumber('${B}')
+                buildNumber('${UTILS_B}')
                 includePatterns('ChefCI/**')
             }
         }
@@ -250,6 +254,7 @@ chefCodeAnalysis.with {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
+                    predefinedProp('UTILS_B', '${UTILS_B}')
                     predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
@@ -261,6 +266,7 @@ chefIntegrationTest.with {
     description('This job runs integration tests with a cookbook')
     parameters {
         stringParam('B', '', 'Parent build number')
+        stringParam('UTILS_B', '', 'Parent utils build number')
         stringParam('PARENT_BUILD', 'Unit_Test', 'Parent build name')
     }
     wrappers {
@@ -283,7 +289,7 @@ chefIntegrationTest.with {
     steps {
         copyArtifacts('Sanity_Test') {
             buildSelector {
-                buildNumber('${B}')
+                buildNumber('${UTILS_B}')
             }
         }
         shell('''set +e
@@ -321,6 +327,7 @@ chefIntegrationTest.with {
             trigger(projectFolderName + '/Promote_NonProd_Chef_Server') {
                 parameters {
                     predefinedProp('B', '${B}')
+                    predefinedProp('UTILS_B', '${UTILS_B}')
                     predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
@@ -332,6 +339,7 @@ chefPromoteNonProdChefServer.with {
     description('This job uploads a cookbook to a non-production Chef Server')
     parameters {
         stringParam('B', '', 'Parent build number')
+        stringParam('UTILS_B', '', 'Parent utils build number')
         stringParam('PARENT_BUILD', 'Integration_Test', 'Parent build name')
     }
     wrappers {
@@ -357,7 +365,7 @@ chefPromoteNonProdChefServer.with {
     steps {
         copyArtifacts('Sanity_Test') {
             buildSelector {
-                buildNumber('${B}')
+                buildNumber('${UTILS_B}')
                 includePatterns('ChefCI/**')
             }
         }
