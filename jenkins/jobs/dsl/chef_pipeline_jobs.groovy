@@ -144,7 +144,7 @@ chefSanityTest.with {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
-                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
+                    predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
         }
@@ -193,7 +193,7 @@ chefUnitTest.with {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
-                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
+                    predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
         }
@@ -250,7 +250,7 @@ chefCodeAnalysis.with {
                 condition('UNSTABLE_OR_BETTER')
                 parameters {
                     predefinedProp('B', '${B}')
-                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
+                    predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
         }
@@ -321,7 +321,7 @@ chefIntegrationTest.with {
             trigger(projectFolderName + '/Promote_NonProd_Chef_Server') {
                 parameters {
                     predefinedProp('B', '${B}')
-                    predefinedProp('PARENT_BUILD', '${PARENT_BUILD}')
+                    predefinedProp('PARENT_BUILD', '${JOB_NAME}')
                 }
             }
         }
