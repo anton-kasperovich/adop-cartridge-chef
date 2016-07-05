@@ -1,2 +1,2 @@
-https://github.com/kramos/vim.git
-https://github.com/kramos/adop-cartridge-chef-scripts.git
+https://github.com/accenture/adop-cartridge-chef-reference.git
+https://github.com/accenture/adop-cartridge-chef-scripts.git

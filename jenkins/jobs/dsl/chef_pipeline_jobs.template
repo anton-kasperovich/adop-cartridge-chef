@@ -10,7 +10,7 @@ def logRotatorArtifactDays = -1
 
 def cookbookGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + '${COOKBOOK}'
 def cookbookGerritTriggerRegExp = (projectFolderName + '/.*cookbook.*').replaceAll("/", "\\\\/")
-def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/cartridge-chef-scripts"
+def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/adop-cartridge-chef-scripts"
 
 def chefServerUsername = "${CHEF_SERVER_USERNAME}"
 def chefServerValidator = "${CHEF_SERVER_VALIDATOR}"
@@ -39,7 +39,7 @@ pipelineView.with {
 chefGetCookboks.with {
     description('This job downloads a cookbook.')
     parameters {
-        stringParam('COOKBOOK', 'chef-cookbook-vim', "The name of the cookbook to package i.e. adop-cartridge-chef-reference - this job is invoked by a gerrit ref-updated hook")
+        stringParam('COOKBOOK', 'adop-cartridge-chef-reference', "The name of the cookbook to package i.e. nginx-cookbook - this job is invoked by a gerrit ref-updated hook")
     }
     wrappers {
         preBuildCleanup()
