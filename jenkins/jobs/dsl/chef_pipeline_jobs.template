@@ -8,7 +8,7 @@ def logRotatorArtifactNum = 3
 def logRotatorDays = -1
 def logRotatorArtifactDays = -1
 
-def cookbookGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + '${COOKBOOK}'
+def cookbookGitUrl = 'ssh://jenkins@gerrit:29418/${GERRIT_PROJECT}'
 def cookbookGerritTriggerRegExp = (projectFolderName + '/.*cookbook.*').replaceAll("/", "\\\\/")
 def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/adop-cartridge-chef-scripts"
 
@@ -65,6 +65,10 @@ chefGetCookboks.with {
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
         env('PROJECT_NAME',projectFolderName)
+        groovy('''
+if (!binding.variables.containsKey('GERRIT_PROJECT')) {
+    return [GERRIT_PROJECT: "''' + projectFolderName + '''/$COOKBOOK"]
+}'''.stripMargin())
     }
     triggers {
         gerrit {
