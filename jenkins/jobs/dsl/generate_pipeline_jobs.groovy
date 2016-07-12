@@ -6,16 +6,17 @@ def projectFolderName = "${PROJECT_NAME}"
 def generateChefPipelineJobs = freeStyleJob(projectFolderName + "/Generate_Chef_Pipeline_Jobs")
 
 generateChefPipelineJobs.with {
+    description('''This "Seed job" generates Chef cartridge Jenkins jobs and a pipeline view.
+It is not necessary to specify values for this job parameters, you are free to use this cartridge just as "Quality Gate" for you cookbooks, without upload part (last step of the pipeline)
+    ''')
     parameters {
         stringParam('CHEF_SERVER_ORGANIZATION_URL','','Chef Server Organization URL i.e. https://<chef-server-ip>/organizations/<org-name>')
         credentialsParam('CHEF_SERVER_USERNAME') {
             type('com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey')
-            required()
             description('Chef Server username. SSH Username with private key.')
         }
         credentialsParam('CHEF_SERVER_VALIDATOR') {
             type('com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey')
-            required()
             description('Chef Server validator. SSH Username with private key.')
         }
     }

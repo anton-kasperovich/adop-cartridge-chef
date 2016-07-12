@@ -2,29 +2,35 @@
 
 A Cartridge is a set of resources that are loaded into the Platform for a particular project. They may contain anything from a simple reference implementation for a technology to a set of best practice examples for building, deploying, and managing a technology stack that can be used by a project.
 
-This cartridge consists of source code repositories and jenkins jobs.
+This cartridge consists of source code repositories and Jenkins jobs.
 
 ## Source code repositories
 
-Cartrige loads the source code repositories
+Cartridge loads the source code repositories:
 
-
-* [Sample cookbook - VIM](https://github.com/kramos/vim.git)
-* [Scripts used by this cartridge - adop-cartridge-chef-scripts](https://github.com/kramos/adop-cartridge-chef-scripts.git)
+* [Sample cookbook - Vim](https://github.com/accenture/adop-cartridge-chef-reference.git)
+* [Scripts used by this cartridge - adop-cartridge-chef-scripts](https://github.com/accenture/adop-cartridge-chef-scripts.git)
 
 ## Jenkins Jobs
 
-This cartridge generates the jenkins jobs and pipeline views to -
+This cartridge provides the "[Seed job](#seed-job)", which generates the Jenkins jobs and pipeline view to -
 
-* Detect cookbook changes 
-* Perform sanity checks and static code analysis 
-* Run unit tests
-* TODO: check for missing cookbook dependencies  
-* TODO: check version has been bumped
-* TODO: Kitchen converge
-* TODO: Put to a Chef server
+* Detect cookbook changes
+* Perform Sanity checks (Ruby syntax, JSON syntax, Berksfile dependencies)
+* Run Unit tests (Chefspec)
+* Perform Static code analysis (Foodcritc & Cookstyle)
+* Run Integration tests via Kitchen converge (Docker driver by default)
+* Upload cookbook on Chef server (**Chef server settings may be skipped**, optional step)
 
-* TODO: provision a Chef server in ADOP
+### Seed job
+
+Whenever you load the cartridge successfully, as end result, you will get only one Jenkins job - "Generate_Chef_Pipeline_Jobs" (this is what we call a Seed job), which you have to run to set-up your deployment job and generate rest of Jenkins jobs and a pipeline view.
+
+List of parameters which you have to specify to use "Upload cookbook on Chef server" feature:
+
+* CHEF_SERVER_ORGANIZATION_URL - We will use this url as endpoint for cookbook upload.
+* CHEF_SERVER_USERNAME - Jenkins ssh username with private key credentials record.
+* CHEF_SERVER_VALIDATOR - Jenkins ssh username with private key credentials record.
 
 # License
 Please view [license information](LICENSE.md) for the software contained on this image.
@@ -33,11 +39,9 @@ Please view [license information](LICENSE.md) for the software contained on this
 Documentation will be captured within this README.md and this repository's Wiki.
 
 ## Issues
-If you have any problems with or questions about this image, please contact us through a [GitHub issue](https://github.com/Accenture/adop-platform-management/issues).
+If you have any problems with or questions about this image, please contact us through a [GitHub issue](https://github.com/Accenture/adop-cartridge-chef/issues).
 
 ## Contribute
 You are invited to contribute new features, fixes, or updates, large or small; we are always thrilled to receive pull requests, and do our best to process them as fast as we can.
 
-Before you start to code, we recommend discussing your plans through a [GitHub issue](https://github.com/Accenture/adop-platform-management/issues), especially for more ambitious contributions. This gives other contributors a chance to point you in the right direction, give you feedback on your design, and help you find out if someone else is working on the same thing.
-
-
+Before you start to code, we recommend discussing your plans through a [GitHub issue](https://github.com/Accenture/adop-cartridge-chef/issues), especially for more ambitious contributions. This gives other contributors a chance to point you in the right direction, give you feedback on your design, and help you find out if someone else is working on the same thing.

@@ -37,7 +37,7 @@ pipelineView.with {
 }
 
 chefGetCookboks.with {
-    description('This job downloads a cookbook.')
+    description('This job downloads a cookbook. Also job have Gerrit trigger with regexp configuration, it will catch every Git repository within "cookbook" word in name.')
     parameters {
         stringParam('COOKBOOK', 'adop-cartridge-chef-reference', "The name of the cookbook to package i.e. nginx-cookbook - this job is invoked by a gerrit ref-updated hook")
     }
