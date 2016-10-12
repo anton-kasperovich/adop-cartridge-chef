@@ -12,10 +12,6 @@ def cookbookGitUrl = 'ssh://jenkins@gerrit:29418/${GERRIT_PROJECT}'
 def cookbookGerritTriggerRegExp = (projectFolderName + '/.*cookbook.*').replaceAll("/", "\\\\/")
 def chefUtilsGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/adop-cartridge-chef-scripts"
 
-def chefServerUsername = "${CHEF_SERVER_USERNAME}"
-def chefServerValidator = "${CHEF_SERVER_VALIDATOR}"
-def chefServerOrganizationUrl = "${CHEF_SERVER_ORGANIZATION_URL}"
-
 // Jobs
 def chefGetCookboks = freeStyleJob(projectFolderName + '/Get_Cookbooks')
 def chefSanityTest = freeStyleJob(projectFolderName + '/Sanity_Test')
@@ -345,6 +341,9 @@ chefPromoteNonProdChefServer.with {
         stringParam('B', '', 'Parent build number')
         stringParam('UTILS_B', '', 'Parent utils build number')
         stringParam('PARENT_BUILD', 'Integration_Test', 'Parent build name')
+        stringParam('CHEF_SERVER_ORGANIZATION_URL',"${CHEF_SERVER_ORGANIZATION_URL}",'Chef Server Organization URL i.e. https://<chef-server-ip>/organizations/<org-name>')
+        stringParam('CHEF_SERVER_USERNAME',"${CHEF_SERVER_USERNAME}",'Chef Server username. Example: admin')
+        stringParam('CHEF_SERVER_VALIDATOR',"${CHEF_SERVER_VALIDATOR}",'Chef Server validator. Example: validator')
     }
     wrappers {
         preBuildCleanup()
@@ -361,9 +360,6 @@ chefPromoteNonProdChefServer.with {
     environmentVariables {
         env('WORKSPACE_NAME',workspaceFolderName)
         env('PROJECT_NAME',projectFolderName)
-        env('CHEF_SERVER_URL',chefServerOrganizationUrl)
-        env('CHEF_SERVER_USERNAME',chefServerUsername)
-        env('CHEF_SERVER_VALIDATOR',chefServerValidator)
     }
     label('docker')
     steps {
@@ -380,47 +376,18 @@ chefPromoteNonProdChefServer.with {
                 targetDirectory('ChefCI/cookbooks/cookbook')
             }
         }
-        systemGroovyCommand('''
-                |import hudson.model.*
-                |import jenkins.model.*
-                |import com.cloudbees.plugins.credentials.*
-                |import com.cloudbees.plugins.credentials.common.*
-                |import com.cloudbees.plugins.credentials.domains.*
-                |
-                |private findCredentialsById(String cId) {
-                |  def username_matcher = CredentialsMatchers.withId(cId)
-                |  def available_credentials = CredentialsProvider.lookupCredentials(
-                |    StandardUsernameCredentials.class,
-                |    Jenkins.getInstance(),
-                |    hudson.security.ACL.SYSTEM,
-                |    new SchemeRequirement("ssh")
-                |  )
-                |
-                |  return CredentialsMatchers.firstOrNull(available_credentials, username_matcher)
-                |}
-                |
-                |envVars = []
-                |
-                |user = findCredentialsById(build.getEnvironment(listener).get('CHEF_SERVER_USERNAME'))
-                |if (user) {
-                |  envVars.add(new StringParameterValue("USERNAME", user.username))
-                |  build.workspace.child("ChefCI/.chef/${user.username}.pem").write(user.privateKey, "UTF-8")
-                |}
-                |
-                |validator = findCredentialsById(build.getEnvironment(listener).get('CHEF_SERVER_VALIDATOR'))
-                |if (validator) {
-                |  envVars.add(new StringParameterValue("VALIDATOR", validator.username))
-                |  build.workspace.child("ChefCI/.chef/${validator.username}.pem").write(validator.privateKey, "UTF-8")
-                |}
-                |
-                |Thread.currentThread().executable.addAction(new ParametersAction(envVars))
-               '''.stripMargin())
+        copyArtifacts('Generate_Chef_Pipeline_Jobs') {
+            buildSelector {
+                workspace()
+                includePatterns('ChefCI/.chef/*.pem')
+            }
+        }
         shell('''set +e
                 |
                 |docker run -t --rm -e affinity:container==jenkins-slave \\
-                |-e "CHEF_SERVER_URL=${CHEF_SERVER_URL}" \\
-                |-e "USERNAME=${USERNAME}" \\
-                |-e "VALIDATOR=${VALIDATOR}" \\
+                |-e "CHEF_SERVER_URL=${CHEF_SERVER_ORGANIZATION_URL}" \\
+                |-e "USERNAME=${CHEF_SERVER_USERNAME}" \\
+                |-e "VALIDATOR=${CHEF_SERVER_VALIDATOR}" \\
                 |-v jenkins_slave_home:/jenkins_slave_home/ \\
                 |iniweb/adop-chef-test-alpine:0.0.1 \\
                 |/jenkins_slave_home/$JOB_NAME/ChefCI/chef_berks_upload.sh /jenkins_slave_home/$JOB_NAME/ChefCI
